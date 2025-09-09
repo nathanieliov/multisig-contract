@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
-import "./multi-signer-example.sol";
-
 contract MultiSigner {
 
     error OnlySigner();
@@ -37,7 +35,7 @@ contract MultiSigner {
 
     constructor(address[] memory initialSigners) {
         owner = msg.sender;
-        if (initialSigners.length <= minSigners) revert lessThanMinSigners();
+        if (initialSigners.length < minSigners) revert lessThanMinSigners();
 
         for (uint256 i = 0; i < initialSigners.length; i++) {
             address signer = initialSigners[i];
