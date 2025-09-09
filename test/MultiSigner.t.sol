@@ -5,24 +5,28 @@ import {Test} from "forge-std/Test.sol";
 import {MultiSigner} from "../src/MultSigner.sol";
 
 contract MultiSignerTest is Test {
+    event SignerAdded(address indexed newSigner);
     MultiSigner multiSigner;
 
     address authorizer1;
     address authorizer2;
     address authorizer3;
+    address authorizer4;
     address outsider;
 
     function setUp() public {
-        // Create deterministic addresses
+        // init authorizers
         authorizer1 = makeAddr("authorizer1");
         authorizer2 = makeAddr("authorizer2");
         authorizer3 = makeAddr("authorizer3");
+        authorizer4 = makeAddr("authorizer4");
         outsider = makeAddr("outsider");
 
         address[] memory init = new address[](4);
         init[0] = authorizer1;
         init[1] = authorizer2;
         init[2] = authorizer3;
+        init[3] = authorizer4;
 
         // Deploy from this contract; owner = address(this)
         multiSigner = new MultiSigner(init);
@@ -86,7 +90,7 @@ contract MultiSignerTest is Test {
 
         // Expect event on the third vote
         vm.expectEmit(true, false, false, true);
-        emit MultiSigner.SignerAdded(newSigner);
+        emit SignerAdded(newSigner);
         // Third vote by authorizer3 triggers addition
         vm.prank(authorizer3);
         multiSigner.addSigner(newSigner);
