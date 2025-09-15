@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
+interface BridgeInterface {
+    function increaseUnionBridgeLockingCap(uint256 newLockingCap) external returns (int);
+
+    function setUnionBridgeTransferPermissions(bool requestEnabled, bool releaseEnabled) external payable returns (int);
+}
+
 contract MultiSigner {
 
     error OnlySigner();
@@ -71,6 +77,49 @@ contract MultiSigner {
             signaturesRequired = (signers.length / 2) + 1; // update majority
             _resetOperation(opKey);
             emit SignerAdded(newSigner);
+        }
+    }
+
+    function removeSigner(address signerToRemove) public {
+        if (!isSigner[msg.sender]) revert OnlySigner();
+        if (signerToRemove == address(0)) revert InvalidSigner();
+        if (signerToRemove == owner) revert InvalidSigner();
+        if (!isSigner[signerToRemove]) revert InvalidSigner();
+        // Never allow fewer than minSigners to exist
+        if (signers.length <= minSigners) revert lessThanMinSigners();
+
+        bytes32 opKey = keccak256(abi.encodePacked(OperationType.RemoveSigner, signerToRemove));
+        Operation storage op = operations[opKey];
+
+        if (op.votes[msg.sender]) revert AlreadyVoted();
+
+        op.opType = OperationType.RemoveSigner;
+        op.signer = signerToRemove;
+        op.votes[msg.sender] = true;
+        op.voteCount += 1;
+
+        if (op.voteCount >= signaturesRequired) {
+            // execute operation
+            _removeSignerFromSet(signerToRemove);
+            signaturesRequired = (signers.length / 2) + 1; // update majority after removal
+            _resetOperation(opKey);
+            emit SignerRemoved(signerToRemove);
+        }
+    }
+
+    function _removeSignerFromSet(address target) internal {
+        // Clear mapping
+        isSigner[target] = false;
+        // Find and remove from array by swapping with last
+        uint256 len = signers.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (signers[i] == target) {
+                if (i != len - 1) {
+                    signers[i] = signers[len - 1];
+                }
+                signers.pop();
+                break;
+            }
         }
     }
 

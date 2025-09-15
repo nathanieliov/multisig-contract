@@ -6,6 +6,7 @@ import {MultiSigner} from "../src/MultSigner.sol";
 
 contract MultiSignerTest is Test {
     event SignerAdded(address indexed newSigner);
+    event SignerRemoved(address indexed removedSigner);
     MultiSigner multiSigner;
 
     address authorizer1;
@@ -132,5 +133,93 @@ contract MultiSignerTest is Test {
         vm.prank(authorizer1);
         vm.expectRevert(MultiSigner.AlreadyVoted.selector);
         multiSigner.addSigner(newSigner);
+    }
+
+    function testRemoveSigner_MajorityRequiredAndEvent() public {
+        // remove authorizer4 by majority (3-of-4)
+        vm.prank(authorizer1);
+        multiSigner.removeSigner(authorizer4);
+        assertTrue(multiSigner.isSigner(authorizer4));
+
+        vm.prank(authorizer2);
+        multiSigner.removeSigner(authorizer4);
+        assertTrue(multiSigner.isSigner(authorizer4));
+
+        vm.expectEmit(true, false, false, true);
+        emit SignerRemoved(authorizer4);
+        vm.prank(authorizer3);
+        multiSigner.removeSigner(authorizer4);
+
+        assertFalse(multiSigner.isSigner(authorizer4));
+        // New total signers = 3 => signaturesRequired = (3/2)+1 = 2
+        assertEq(multiSigner.signaturesRequired(), 2);
+    }
+
+    function testRemoveSigner_OnlySignerCanVote() public {
+        vm.prank(outsider);
+        vm.expectRevert(MultiSigner.OnlySigner.selector);
+        multiSigner.removeSigner(authorizer1);
+    }
+
+    function testRemoveSigner_RevertOnInvalidInputs() public {
+        // zero address
+        vm.prank(authorizer1);
+        vm.expectRevert(MultiSigner.InvalidSigner.selector);
+        multiSigner.removeSigner(address(0));
+
+        // owner address invalid
+        vm.prank(authorizer2);
+        vm.expectRevert(MultiSigner.InvalidSigner.selector);
+        multiSigner.removeSigner(address(this));
+
+        // non-signer address invalid
+        address notSigner = makeAddr("notSigner");
+        vm.prank(authorizer3);
+        vm.expectRevert(MultiSigner.InvalidSigner.selector);
+        multiSigner.removeSigner(notSigner);
+    }
+
+    function testRemoveSigner_PreventDoubleVote() public {
+        vm.prank(authorizer1);
+        multiSigner.removeSigner(authorizer4);
+        vm.prank(authorizer1);
+        vm.expectRevert(MultiSigner.AlreadyVoted.selector);
+        multiSigner.removeSigner(authorizer4);
+    }
+
+    function testRemoveSigner_CannotDropBelowMinSigners() public {
+        // First remove one signer to go from 4 -> 3
+        vm.prank(authorizer1); multiSigner.removeSigner(authorizer4);
+        vm.prank(authorizer2); multiSigner.removeSigner(authorizer4);
+        vm.prank(authorizer3); multiSigner.removeSigner(authorizer4);
+        assertEq(multiSigner.signaturesRequired(), 2);
+        assertFalse(multiSigner.isSigner(authorizer4));
+
+        // Now we have 3 signers. Any attempt to remove another must revert with lessThanMinSigners
+        vm.prank(authorizer1);
+        vm.expectRevert(MultiSigner.lessThanMinSigners.selector);
+        multiSigner.removeSigner(authorizer2);
+    }
+
+    function testAddThenRemove_Combination() public {
+        address newGuy = makeAddr("newGuy");
+        // Add newGuy (3 votes required)
+        vm.prank(authorizer1); multiSigner.addSigner(newGuy);
+        vm.prank(authorizer2); multiSigner.addSigner(newGuy);
+        vm.expectEmit(true, false, false, true);
+        emit SignerAdded(newGuy);
+        vm.prank(authorizer3); multiSigner.addSigner(newGuy);
+        assertTrue(multiSigner.isSigner(newGuy));
+        assertEq(multiSigner.signaturesRequired(), 3); // 5 signers => 3
+
+        // Remove newGuy (still 3 votes required at 5 signers)
+        vm.prank(authorizer1); multiSigner.removeSigner(newGuy);
+        vm.prank(authorizer2); multiSigner.removeSigner(newGuy);
+        vm.expectEmit(true, false, false, true);
+        emit SignerRemoved(newGuy);
+        vm.prank(authorizer3); multiSigner.removeSigner(newGuy);
+
+        assertFalse(multiSigner.isSigner(newGuy));
+        assertEq(multiSigner.signaturesRequired(), 3); // back to 4 signers => 3
     }
 }
