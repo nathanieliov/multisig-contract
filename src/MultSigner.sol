@@ -9,6 +9,8 @@ interface BridgeInterface {
 
 contract MultiSigner {
 
+    BridgeInterface public bridge = BridgeInterface(0x0000000000000000000000000000000001000006);
+
     error OnlySigner();
     error AlreadyInitialized();
     error lessThanMinSigners();
@@ -26,7 +28,7 @@ contract MultiSigner {
     address[] public signers;
     mapping(address => bool) public isSigner;
 
-    enum OperationType { AddSigner, RemoveSigner}
+    enum OperationType { AddSigner, RemoveSigner, IncreaseLockingCap, SetTransferPermissions}
 
     struct Operation {
         OperationType opType;
@@ -51,7 +53,8 @@ contract MultiSigner {
             isSigner[signer] = true;
         }
 
-        signaturesRequired = (signers.length / 2) + 1; // strict majority
+        signaturesRequired = (signers.length / 2) + 1;
+
     }
 
     function addSigner(address newSigner) public {
@@ -120,6 +123,38 @@ contract MultiSigner {
                 signers.pop();
                 break;
             }
+        }
+    }
+
+    function increaseUnionBridgeLockingCap(uint256 newLockingCap) public {
+        if (!isSigner[msg.sender]) revert OnlySigner();
+        // Operation id = by type + newLockingCap
+        bytes32 opKey = keccak256(abi.encodePacked(OperationType.IncreaseLockingCap, newLockingCap));
+        Operation storage op = operations[opKey];
+        if (op.votes[msg.sender]) revert AlreadyVoted();
+        op.opType = OperationType.IncreaseLockingCap;
+        op.votes[msg.sender] = true;
+        op.voteCount += 1;
+        if (op.voteCount >= signaturesRequired) {
+            // execute call on bridge
+            bridge.increaseUnionBridgeLockingCap(newLockingCap);
+            _resetOperation(opKey);
+        }
+    }
+
+    function setUnionBridgeTransferPermissions(bool requestEnabled, bool releaseEnabled) public {
+        if (!isSigner[msg.sender]) revert OnlySigner();
+        // Operation ID = by type + requestEnabled + releaseEnabled
+        bytes32 opKey = keccak256(abi.encodePacked(OperationType.SetTransferPermissions, requestEnabled, releaseEnabled));
+        Operation storage op = operations[opKey];
+        if (op.votes[msg.sender]) revert AlreadyVoted();
+        op.opType = OperationType.SetTransferPermissions;
+        op.votes[msg.sender] = true;
+        op.voteCount += 1;
+        if (op.voteCount >= signaturesRequired) {
+            // execute call on bridge
+            bridge.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
+            _resetOperation(opKey);
         }
     }
 
