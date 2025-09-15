@@ -92,7 +92,6 @@ contract MultiSignerTest is Test {
     }
 
     function testConstructor_RevertWhenOwnerIncluded() public {
-        // Owner is address(this) during deployment
         address[] memory initAuthorizers = new address[](4);
         initAuthorizers[0] = makeAddr("authorizer1");
         initAuthorizers[1] = makeAddr("authorizer2");
@@ -262,71 +261,71 @@ contract MultiSignerTest is Test {
     }
 
     function testBridge_IncreaseLockingCap_MajorityVoteAndExecutes() public {
-        uint256 cap = 1_000_000 ether;
+        uint256 newLockingCap = 1_000_000 ether;
         // First vote
         vm.prank(authorizer1);
-        multiSigner.increaseUnionBridgeLockingCap(cap);
+        multiSigner.increaseUnionBridgeLockingCap(newLockingCap);
         assertEq(bridgeAt.increaseUnionLockingCapNumberOfCalls(), 0);
 
         // Second vote
         vm.prank(authorizer2);
-        multiSigner.increaseUnionBridgeLockingCap(cap);
+        multiSigner.increaseUnionBridgeLockingCap(newLockingCap);
         assertEq(bridgeAt.increaseUnionLockingCapNumberOfCalls(), 0);
 
         // Third vote triggers execution
         vm.prank(authorizer3);
-        multiSigner.increaseUnionBridgeLockingCap(cap);
+        multiSigner.increaseUnionBridgeLockingCap(newLockingCap);
         assertEq(bridgeAt.increaseUnionLockingCapNumberOfCalls(), 1);
-        assertEq(bridgeAt._unionBridgeLockingCap(), cap);
+        assertEq(bridgeAt._unionBridgeLockingCap(), newLockingCap);
     }
 
     function testBridge_IncreaseLockingCap_OnlySignerAndNoDoubleVote() public {
-        uint256 cap = 12345;
+        uint256 newLockingCap = 2_000_000 ether;
         // Non-signer cannot vote
         vm.prank(unauthorizedCaller);
         vm.expectRevert(MultiSigner.OnlySigner.selector);
-        multiSigner.increaseUnionBridgeLockingCap(cap);
+        multiSigner.increaseUnionBridgeLockingCap(newLockingCap);
 
         // Same signer cannot vote twice on same param
         vm.prank(authorizer1);
-        multiSigner.increaseUnionBridgeLockingCap(cap);
+        multiSigner.increaseUnionBridgeLockingCap(newLockingCap);
         vm.prank(authorizer1);
         vm.expectRevert(MultiSigner.AlreadyVoted.selector);
-        multiSigner.increaseUnionBridgeLockingCap(cap);
+        multiSigner.increaseUnionBridgeLockingCap(newLockingCap);
     }
 
     function testBridge_SetTransferPermissions_MajorityVoteAndExecutes() public {
-        bool req = true;
-        bool rel = false;
+        bool requestEnabled = true;
+        bool releaseEnabled = false;
         // First vote
         vm.prank(authorizer1);
-        multiSigner.setUnionBridgeTransferPermissions(req, rel);
+        multiSigner.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
         assertEq(bridgeAt.setTransferPermissionsNumberOfCalls(), 0);
 
         // Second vote
         vm.prank(authorizer2);
-        multiSigner.setUnionBridgeTransferPermissions(req, rel);
+        multiSigner.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
         assertEq(bridgeAt.setTransferPermissionsNumberOfCalls(), 0);
 
         // Third vote triggers execution
         vm.prank(authorizer3);
-        multiSigner.setUnionBridgeTransferPermissions(req, rel);
+        multiSigner.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
         assertEq(bridgeAt.setTransferPermissionsNumberOfCalls(), 1);
-        assertEq(bridgeAt._requestEnabled(), req);
-        assertEq(bridgeAt._releaseEnabled(), rel);
+        assertEq(bridgeAt._requestEnabled(), requestEnabled);
+        assertEq(bridgeAt._releaseEnabled(), releaseEnabled);
     }
 
     function testBridge_SetTransferPermissions_OnlySignerAndNoDoubleVote() public {
-        bool req = false;
-        bool rel = true;
+        bool requestEnabled = false;
+        bool releaseEnabled = true;
         vm.prank(unauthorizedCaller);
         vm.expectRevert(MultiSigner.OnlySigner.selector);
-        multiSigner.setUnionBridgeTransferPermissions(req, rel);
+        multiSigner.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
 
         vm.prank(authorizer2);
-        multiSigner.setUnionBridgeTransferPermissions(req, rel);
+        multiSigner.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
         vm.prank(authorizer2);
         vm.expectRevert(MultiSigner.AlreadyVoted.selector);
-        multiSigner.setUnionBridgeTransferPermissions(req, rel);
+        multiSigner.setUnionBridgeTransferPermissions(requestEnabled, releaseEnabled);
     }
 }

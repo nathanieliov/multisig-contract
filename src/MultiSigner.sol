@@ -110,13 +110,13 @@ contract MultiSigner {
         }
     }
 
-    function _removeSignerFromSet(address target) internal {
-        // Clear mapping
-        isSigner[target] = false;
+    function _removeSignerFromSet(address signerToRemove) internal {
+        // Set as not signer
+        isSigner[signerToRemove] = false;
         // Find and remove from array by swapping with last
         uint256 len = signers.length;
         for (uint256 i = 0; i < len; i++) {
-            if (signers[i] == target) {
+            if (signers[i] == signerToRemove) {
                 if (i != len - 1) {
                     signers[i] = signers[len - 1];
                 }
